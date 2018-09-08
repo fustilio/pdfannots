@@ -86,7 +86,7 @@ class RectExtractor(TextConverter):
         render(ltpage)
 
 class Annotation:
-    def __init__(self, pageno, tagname, coords=None, rect=None, contents=None):
+    def __init__(self, pageno, tagname, coords=None, rect=None, contents=None, colour=None):
         self.pageno = pageno
         self.tagname = tagname
         if contents == '':
@@ -108,6 +108,11 @@ class Annotation:
                 yvals = [y0, y1, y2, y3]
                 box = (min(xvals), min(yvals), max(xvals), max(yvals))
                 self.boxes.append(box)
+
+        if colour is None:
+            self.colour = None
+        else:
+            self.colour = colour
 
     def capture(self, text):
         if text == '\n':
@@ -141,12 +146,14 @@ def getannots(pdfannots, pageno):
         subtype = pa.get('Subtype')
         if subtype is not None and subtype.name not in ANNOT_SUBTYPES:
             continue
+        
+        colour = pa.get('C')
 
         contents = pa.get('Contents')
         if contents is not None:
             contents = str(contents, 'iso8859-15') #'utf-8'
             contents = contents.replace('\r\n', '\n').replace('\r', '\n')
-        a = Annotation(pageno, subtype.name.lower(), pa.get('QuadPoints'), pa.get('Rect'), contents)
+        a = Annotation(pageno, subtype.name.lower(), pa.get('QuadPoints'), pa.get('Rect'), contents, colour)
         annots.append(a)
 
     return annots
@@ -221,7 +228,7 @@ def prettyprint(annots, outlines, mediaboxes):
     if highlights:
         print("## Highlights\n")
         for a in highlights:
-            printitem(fmtpos(a), fmttext(a))
+            printitem(fmtpos(a), fmttext(a), str(a.colour))
 
     if comments:
         if highlights:
@@ -309,6 +316,7 @@ def printannots(fh):
         pdfannots = []
         for a in pdftypes.resolve1(page.annots):
             if isinstance(a, pdftypes.PDFObjRef):
+                print(a.resolve())
                 pdfannots.append(a.resolve())
             else:
                 sys.stderr.write('Warning: unknown annotation: %s\n' % a)
@@ -330,7 +338,6 @@ def printannots(fh):
         sys.stderr.write("Warning: failed to retrieve outlines: %s\n" % e)
 
     device.close()
-
     prettyprint(allannots, outlines, mediaboxes)
 
 def main():
